@@ -1,0 +1,38 @@
+.tarjeta-usuario {
+  background: #2d2d2d; /* Fondo gris oscuro en lugar de blanco */
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  color: #e0e0e0; /* Texto claro para contraste con el fondo oscuro */
+  margin: 10px; /* Margen para separar las tarjetas */
+}
+
+.tarjeta-usuario.mora {
+  border-left: 4px solid red;
+}
+
+.tarjeta-usuario.aldia {
+  border-left: 4px solid green;
+}
+
+.tarjeta-usuario:hover {
+  transform: scale(1.02);
+}
+
+.btn-detalle {
+  background: #3b82f6;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.estado {
+  font-weight: bold;
+  color: #e0e0e0; /* Ajustar el color del estado para que sea visible */
+}

@@ -1,0 +1,117 @@
+.modal {
+  display: block;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.modal-contenido {
+  background: #2d2d2d;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  color: #e0e0e0;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.modal-contenido * {
+  max-width: 100%;
+  word-wrap: break-word;
+}
+
+.oculto {
+  display: none;
+}
+
+.cerrar {
+  position: fixed;
+  top: calc(10vh - 15px);
+  right: calc(50% - 300px - 15px);
+  background: #ff4444;
+  color: white;
+  width: 40px;
+  height: 40px;
+  line-height: 40px;
+  text-align: center;
+  border-radius: 50%;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.cerrar:hover {
+  background: #cc0000;
+  transform: scale(1.1);
+}
+
+#formulario-pago {
+    background: #3a3a3a; /* Fondo más claro que la modal, pero en la misma paleta */
+    padding: 15px;
+    border-radius: 6px;
+    margin-top: 15px;
+    border: 1px solid #ffcc00; /* Borde sutil para diferenciar */
+}
+
+#formulario-pago label {
+    color: #e0e0e0;
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: block;
+}
+
+#formulario-pago select,
+#formulario-pago input,
+#formulario-pago textarea {
+    background: #4a4a4a; /* Fondo de los inputs */
+    color: #e0e0e0;
+    border: 1px solid #5a5a5a;
+    border-radius: 4px;
+    padding: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease;
+}
+
+#formulario-pago select:focus,
+#formulario-pago input:focus,
+#formulario-pago textarea:focus {
+    border-color: #888;
+    outline: none;
+}
+
+#formulario-pago button {
+    background: #ffcc00; /* Azul similar al btn-pago */
+    color: black;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+#formulario-pago button:hover {
+    background: #357abd; /* Hover más oscuro */
+    transform: scale(1.05);
+}
+
+@media (max-width: 640px) {
+  .cerrar {
+    right: calc(5% - 15px);
+  }
+}

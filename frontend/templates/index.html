@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Parqueadero Villamil 24h</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tarjeta_usuario.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/modal_detalle.css') }}" />
+</head>
+<body>
+  <main class="container mx-auto px-4">
+    <header>
+      <h1>Parqueadero Villamil 24h</h1>
+    </header>
+
+    <!-- Buscador general -->
+    <section class="buscador p-4">
+      <label for="tipo-busqueda" class="block mb-2 font-bold">Buscar por:</label>
+      <select id="tipo-busqueda" class="p-2 rounded w-full">
+        <option value="">Seleccione una opción</option>
+        <option value="placa">Placa</option>
+        <option value="persona">Nombre/Apellido</option>
+        <option value="deudores">Ver deudores</option>
+        <option value="aldia">Ver al día</option>
+      </select>
+
+      <div id="busqueda-input" class="mt-4 hidden">
+        <input id="input-busqueda" type="text" class="w-full p-2 rounded" placeholder="Escribe tu búsqueda..." />
+        <button id="btn-buscar" class="mt-2 bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded">Buscar</button>
+      </div>
+    </section>
+
+    <!-- Contenedor de resultados -->
+    <section id="resultados" class="resultados mt-6 grid grid-cols-2 gap-6"></section>
+
+    <!-- Contenedor para el modal -->
+    <div id="modal-container"></div>
+  </main>
+
+  <!-- Scripts -->
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

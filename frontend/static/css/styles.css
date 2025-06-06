@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+body {
+  background-color: #1e1e1e; /* Fondo gris carbón oscuro */
+  color: #fff; /* Texto claro para contraste */
+  font-family: 'Poppins', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Botones */
+button {
+  background-color: #ffcc00;  /* Amarillo vivo, pero suave */
+  color: #222;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  margin: 6px 6px 6px 0;
+  font-family: 'Poppins', sans-serif;
+}
+
+button:hover {
+  background-color: #e6b800; /* Amarillo un poco más oscuro */
+}
+
+/* Inputs */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+  width: 100%;
+  padding: 10px 15px;
+  font-size: 1rem;
+  border: 2px solid #ccc;
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.3s ease;
+  font-family: 'Poppins', sans-serif;
+  box-sizing: border-box;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+  border-color: #ffcc00; /* Resalta con amarillo al enfocar */
+  box-shadow: 0 0 8px rgba(255, 204, 0, 0.5);
+}
+
+/* Para inputs deshabilitados */
+input[disabled],
+textarea[disabled],
+select[disabled] {
+  background-color: #f5f5f5;
+  border-color: #ddd;
+  cursor: not-allowed;
+  color: #999;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Espacio entre inputs y otros elementos de formulario */
+input, select, textarea {
+  margin-bottom: 8px; /* separación vertical */
+  display: block; /* para que el margin-bottom funcione mejor y se alineen en columna */
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Si tienes grupos de botones o inputs, también puede ayudar un padding en el contenedor */
+.form-group {
+  margin-bottom: 12px; /* espacio entre grupos de elementos */
+}
+
+/* Opcional: espacio entre etiquetas y campos */
+label {
+  display: block;
+  margin-bottom: 4px;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Contenedor principal */
+.container {
+  max-width: 1200px; /* Limita el ancho máximo del contenido */
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Ajustar padding para pantallas pequeñas */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
