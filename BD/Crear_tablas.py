@@ -1,7 +1,12 @@
 import sqlite3
+import os
+
 
 def crear_tablas():
-    conexion = sqlite3.connect('parqueadero.db')
+    # Usar la base de datos central del backend (ruta calculada desde este script)
+    base_dir = os.path.dirname(__file__)
+    db_path = os.path.abspath(os.path.join(base_dir, '..', 'backend', 'parqueadero.db'))
+    conexion = sqlite3.connect(db_path)
     cursor = conexion.cursor()
 
     # Crear tabla propietarios
@@ -24,6 +29,9 @@ def crear_tablas():
             modelo TEXT,
             anio INTEGER,
             color TEXT,
+            tipo TEXT,
+            valor_mensual REAL,
+            puesto TEXT,
             FOREIGN KEY (propietario_id) REFERENCES propietarios(id)
         )
     ''')
@@ -34,12 +42,13 @@ def crear_tablas():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             propietario_id INTEGER,
             vehiculo_id INTEGER,
-            puesto TEXT,
             fecha_pago_esperado DATE,
             fecha_pago_real DATE,
             pagado BOOLEAN,
             metodo_pago TEXT,
             observacion TEXT,
+            monto REAL,
+            puesto TEXT,
             FOREIGN KEY (propietario_id) REFERENCES propietarios(id),
             FOREIGN KEY (vehiculo_id) REFERENCES vehiculos(id)
         )

@@ -1,21 +1,22 @@
 import sqlite3
-import os
+from backend.db import get_connection
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DB_PATH = os.path.join(BASE_DIR, "backend", "parqueadero.db")
 
 def obtener_todos_los_propietarios():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM propietarios")
-    resultado = cursor.fetchall()
-    conn.close()
-    return resultado
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, nombre, celular, celular_alternativo FROM propietarios")
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
 
 def obtener_propietario_por_id(propietario_id):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM propietarios WHERE id = ?", (propietario_id,))
-    resultado = cursor.fetchone()
-    conn.close()
-    return resultado
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, nombre, celular, celular_alternativo FROM propietarios WHERE id = ?", (propietario_id,))
+        return cursor.fetchone()
+    finally:
+        conn.close()

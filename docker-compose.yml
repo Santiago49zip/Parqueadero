@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  parqueadero:
+    build: .
+    image: parqueadero_app:latest
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/parqueadero.db:/app/backend/parqueadero.db
+    environment:
+      - FLASK_ENV=production

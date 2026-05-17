@@ -126,6 +126,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Cargar resumen del sistema (dashboard)
+  async function loadResumen() {
+    try {
+      const res = await fetch('/resumen');
+      if (!res.ok) throw new Error('No se pudo obtener el resumen');
+      const data = await res.json();
+      renderResumen(data);
+    } catch (err) {
+      console.error('Error cargando resumen:', err);
+    }
+  }
+
+  function renderResumen(data) {
+    const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = (v !== undefined && v !== null) ? v : '--'; };
+    setText('total-propietarios', data.total_propietarios ?? '--');
+    setText('total-vehiculos', data.total_vehiculos ?? '--');
+    setText('total-deudores', data.deudores ?? '--');
+    setText('total-aldia', data.aldia ?? '--');
+  }
+
   // Mostrar detalles en el modal
   // Mostrar detalles en el modal
   async function mostrarDetalles(item) {
@@ -214,6 +234,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const modalContent = document.getElementById("detalle-contenido");
       if (modalContent) {
         modalContent.innerHTML = html;
+        // Establecer fecha por defecto al primer día del mes
+        const fechaInput = document.getElementById('fecha-esperado');
+        if (fechaInput) {
+          const now = new Date();
+          const defaultDate = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+          fechaInput.value = defaultDate;
+        }
         const modal = document.getElementById("modal-detalle");
         if (modal) {
           modal.classList.remove("oculto");
@@ -296,7 +323,9 @@ document.addEventListener("DOMContentLoaded", () => {
                   formularioPago.classList.add("hidden");
                   formularioPago.reset();
                   cerrarModal();
+                  // Refrescar lista y dashboard
                   buscar();
+                  loadResumen();
                 } else {
                   alert(`Error al registrar el pago: ${data.error || "Error desconocido"}`);
                 }
@@ -355,4 +384,7 @@ document.addEventListener("DOMContentLoaded", () => {
       buscar();
     }
   });
+
+  // Cargar resumen inicial
+  loadResumen();
 });

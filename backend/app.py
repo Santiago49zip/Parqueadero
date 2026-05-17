@@ -1,5 +1,10 @@
 from flask import Flask, jsonify, request, render_template, send_from_directory
-from consultas import propietarios, vehiculos, pagos
+try:
+    from backend.consultas import propietarios, vehiculos, pagos
+    from backend.db import get_connection
+except ImportError:
+    from consultas import propietarios, vehiculos, pagos
+    from db import get_connection
 from datetime import datetime
 import urllib.parse
 import os
@@ -14,16 +19,94 @@ app = Flask(__name__,
             static_folder="../frontend/static")
 
 def get_db_connection():
-    BASE_DIR = os.path.abspath(os.path.dirname(__file__))  # Directorio de app.py: C:\Proyectos\Parqueadero\backend
-    DB_PATH = os.path.join(BASE_DIR, "parqueadero.db")    # Ruta: C:\Proyectos\Parqueadero\backend\parqueadero.db
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        logging.debug(f"Conexión a la base de datos establecida: {DB_PATH}")
+        conn = get_connection()
+        logging.debug("Conexión a la base de datos establecida")
         return conn
     except sqlite3.Error as e:
         logging.error(f"Error al conectar con la base de datos: {str(e)}")
         raise
+
+
+def normalizar_placa(placa):
+    return placa.strip().upper().replace(' ', '') if placa else ''
+
+
+def obtener_pagos_mes_actual(cursor, mes_actual):
+    cursor.execute('''
+        SELECT vehiculo_id, monto, fecha_pago_esperado, fecha_pago_real, pagado, metodo_pago
+        FROM pagos
+        WHERE strftime('%Y-%m', fecha_pago_esperado) = ?
+        ORDER BY vehiculo_id, fecha_pago_real DESC
+    ''', (mes_actual,))
+    pagos = {}
+    for pago in cursor.fetchall():
+        if pago['vehiculo_id'] not in pagos:
+            pagos[pago['vehiculo_id']] = pago
+    return pagos
+
+
+def construir_resultado(row, pago):
+    valor_mensual = row['valor_mensual'] if row['valor_mensual'] is not None else 0
+    monto_pagado = float(pago['monto']) if pago and pago['pagado'] else 0
+    deuda = max(valor_mensual - monto_pagado, 0)
+    estado = 'al día' if pago and pago['pagado'] and deuda <= 0 else 'en mora'
+    return {
+        'propietario_id': row['propietario_id'],
+        'nombre': row['nombre'],
+        'celular': row['celular'],
+        'vehiculo_id': row['vehiculo_id'],
+        'placa': row['placa'],
+        'marca': row['marca'],
+        'modelo': row['modelo'],
+        'anio': row['anio'],
+        'color': row['color'],
+        'tipo': row['tipo'],
+        'valor_mensual': valor_mensual,
+        'puesto': row['puesto'],
+        'estado': estado,
+        'monto_pagado': monto_pagado,
+        'deuda': deuda,
+        'fecha_pago_esperado': pago['fecha_pago_esperado'] if pago else None,
+        'fecha_pago_real': pago['fecha_pago_real'] if pago else None,
+        'metodo_pago': pago['metodo_pago'] if pago else None
+    }
+
+
+def obtener_resumen_general():
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM propietarios')
+        total_propietarios = cursor.fetchone()[0]
+        cursor.execute('SELECT COUNT(*) FROM vehiculos')
+        total_vehiculos = cursor.fetchone()[0]
+        mes_actual = datetime.now().strftime('%Y-%m')
+        pagos_mes = obtener_pagos_mes_actual(cursor, mes_actual)
+
+        deudores = 0
+        al_dia = 0
+        for vehiculo_id in [row['id'] for row in cursor.execute('SELECT id FROM vehiculos').fetchall()]:
+            row = {'valor_mensual': 0}
+            cursor.execute('SELECT valor_mensual FROM vehiculos WHERE id = ?', (vehiculo_id,))
+            valor = cursor.fetchone()
+            if valor and valor[0] is not None:
+                row['valor_mensual'] = valor[0]
+            pago = pagos_mes.get(vehiculo_id)
+            resultado = construir_resultado({'propietario_id': None, 'nombre': None, 'celular': None, 'vehiculo_id': vehiculo_id, 'placa': None, 'marca': None, 'modelo': None, 'anio': None, 'color': None, 'tipo': None, 'valor_mensual': row['valor_mensual'], 'puesto': None}, pago)
+            if resultado['estado'] == 'en mora':
+                deudores += 1
+            else:
+                al_dia += 1
+
+        return {
+            'total_propietarios': total_propietarios,
+            'total_vehiculos': total_vehiculos,
+            'deudores': deudores,
+            'aldia': al_dia
+        }
+    finally:
+        conn.close()
 
 def verificar_pagos_mes_actual():
     try:
@@ -75,122 +158,113 @@ def verificar_pagos_mes_actual():
 def interfaz_web():
     return render_template("index.html")
 
+
+@app.route('/resumen', methods=['GET'])
+def resumen():
+    try:
+        data = obtener_resumen_general()
+        return jsonify(data), 200
+    except Exception as e:
+        logging.error(f"Error al obtener resumen: {str(e)}")
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
 @app.route("/buscar", methods=["GET"])
 def buscar():
     try:
         # Verificar pagos del mes actual antes de buscar
         verificar_pagos_mes_actual()
-        
-        tipo = request.args.get('tipo')
-        query = request.args.get('query', '')
-        hoy = datetime.now().strftime("%Y-%m-%d")
+        tipo = request.args.get('tipo', '').strip()
+        query = request.args.get('query', '').strip()
+        mes_actual = datetime.now().strftime("%Y-%m")
 
-        logging.debug(f"Parámetros recibidos: tipo={tipo}, query={query}, hoy={hoy}")
+        logging.debug(f"Parámetros recibidos: tipo={tipo}, query={query}, mes_actual={mes_actual}")
 
         if not tipo:
             return jsonify({"error": "Tipo de búsqueda no proporcionado"}), 400
 
         conn = get_db_connection()
         cursor = conn.cursor()
+        query_base = '''
+            SELECT
+                A.id AS propietario_id,
+                A.nombre,
+                A.celular,
+                B.id AS vehiculo_id,
+                B.placa,
+                B.marca,
+                B.modelo,
+                B.anio,
+                B.color,
+                B.tipo,
+                B.valor_mensual,
+                B.puesto,
+                (SELECT monto FROM pagos
+                   WHERE vehiculo_id = B.id AND strftime('%Y-%m', fecha_pago_esperado) = ?
+                   ORDER BY fecha_pago_real DESC
+                   LIMIT 1) AS monto,
+                (SELECT fecha_pago_esperado FROM pagos
+                   WHERE vehiculo_id = B.id AND strftime('%Y-%m', fecha_pago_esperado) = ?
+                   ORDER BY fecha_pago_real DESC
+                   LIMIT 1) AS fecha_pago_esperado,
+                (SELECT fecha_pago_real FROM pagos
+                   WHERE vehiculo_id = B.id AND strftime('%Y-%m', fecha_pago_esperado) = ?
+                   ORDER BY fecha_pago_real DESC
+                   LIMIT 1) AS fecha_pago_real,
+                (SELECT pagado FROM pagos
+                   WHERE vehiculo_id = B.id AND strftime('%Y-%m', fecha_pago_esperado) = ?
+                   ORDER BY fecha_pago_real DESC
+                   LIMIT 1) AS pagado,
+                (SELECT metodo_pago FROM pagos
+                   WHERE vehiculo_id = B.id AND strftime('%Y-%m', fecha_pago_esperado) = ?
+                   ORDER BY fecha_pago_real DESC
+                   LIMIT 1) AS metodo_pago
+            FROM propietarios A
+            INNER JOIN vehiculos B ON A.id = B.propietario_id
+        '''
 
+        base_params = [mes_actual] * 5
+        if tipo == 'placa':
+            sql_query = query_base + ' WHERE UPPER(REPLACE(B.placa, " ", "")) LIKE ?'
+            params = base_params + [f'%{normalizar_placa(query)}%']
+        elif tipo == 'persona':
+            sql_query = query_base + ' WHERE LOWER(A.nombre) LIKE ?'
+            params = base_params + [f'%{query.lower()}%']
+        elif tipo == 'deudores':
+            sql_query = query_base + '''
+                WHERE COALESCE((SELECT pagado FROM pagos
+                        WHERE vehiculo_id = B.id AND strftime('%Y-%m', fecha_pago_esperado) = ?
+                        ORDER BY fecha_pago_real DESC LIMIT 1), 0) = 0
+                OR COALESCE((SELECT monto FROM pagos
+                        WHERE vehiculo_id = B.id AND strftime('%Y-%m', fecha_pago_esperado) = ?
+                        ORDER BY fecha_pago_real DESC LIMIT 1), 0) < COALESCE(B.valor_mensual, 0)
+            '''
+            params = base_params + [mes_actual, mes_actual]
+        elif tipo == 'aldia':
+            sql_query = query_base + '''
+                WHERE COALESCE((SELECT pagado FROM pagos
+                        WHERE vehiculo_id = B.id AND strftime('%Y-%m', fecha_pago_esperado) = ?
+                        ORDER BY fecha_pago_real DESC LIMIT 1), 0) = 1
+                AND COALESCE((SELECT monto FROM pagos
+                        WHERE vehiculo_id = B.id AND strftime('%Y-%m', fecha_pago_esperado) = ?
+                        ORDER BY fecha_pago_real DESC LIMIT 1), 0) >= COALESCE(B.valor_mensual, 0)
+            '''
+            params = base_params + [mes_actual, mes_actual]
+        else:
+            return jsonify({"error": "Tipo de búsqueda inválido"}), 400
+
+        cursor.execute(sql_query, params)
+        rows = cursor.fetchall()
         resultados = []
-        if tipo in ['placa', 'persona']:
-            query_base = '''
-                SELECT A.id AS propietario_id, A.nombre, A.celular, 
-                       B.id AS vehiculo_id, B.placa, B.marca, B.modelo, B.anio, B.color, B.tipo, B.valor_mensual, B.puesto
-                FROM propietarios A
-                INNER JOIN vehiculos B ON A.id = B.propietario_id
-            '''
-            if tipo == 'placa':
-                sql_query = query_base + ' WHERE UPPER(REPLACE(B.placa, " ", "")) LIKE ?'
-                params = (f'%{query.upper().replace(" ", "")}%',)
-            elif tipo == 'persona':
-                sql_query = query_base + ' WHERE A.nombre LIKE ?'
-                params = (f'%{query}%',)
+        for row in rows:
+            pago = {
+                'monto': row['monto'],
+                'fecha_pago_esperado': row['fecha_pago_esperado'],
+                'fecha_pago_real': row['fecha_pago_real'],
+                'pagado': row['pagado'],
+                'metodo_pago': row['metodo_pago']
+            } if row['monto'] is not None or row['pagado'] is not None else None
 
-            cursor.execute(sql_query, params)
-            rows = cursor.fetchall()
-
-            for row in rows:
-                cursor.execute('''
-                    SELECT monto, fecha_pago_esperado, fecha_pago_real, pagado, metodo_pago
-                    FROM pagos
-                    WHERE vehiculo_id = ? AND strftime('%Y-%m', fecha_pago_esperado) = strftime('%Y-%m', ?)
-                    ORDER BY fecha_pago_real DESC LIMIT 1
-                ''', (row["vehiculo_id"], hoy))
-                pago = cursor.fetchone()
-
-                valor_mensual = row["valor_mensual"] if row["valor_mensual"] is not None else 0
-                monto_pagado = pago["monto"] if pago and pago["pagado"] else 0
-                deuda = valor_mensual - monto_pagado
-                estado = "al día" if pago and pago["pagado"] and deuda <= 0 else "en mora"
-
-                resultados.append({
-                    "propietario_id": row["propietario_id"],
-                    "nombre": row["nombre"],
-                    "celular": row["celular"],
-                    "vehiculo_id": row["vehiculo_id"],
-                    "placa": row["placa"],
-                    "marca": row["marca"],
-                    "modelo": row["modelo"],
-                    "anio": row["anio"],
-                    "color": row["color"],
-                    "tipo": row["tipo"],
-                    "valor_mensual": valor_mensual,
-                    "puesto": row["puesto"],
-                    "estado": estado,
-                    "monto_pagado": monto_pagado,
-                    "deuda": deuda,
-                    "fecha_pago_esperado": pago["fecha_pago_esperado"] if pago else None,
-                    "fecha_pago_real": pago["fecha_pago_real"] if pago else None,
-                    "metodo_pago": pago["metodo_pago"] if pago else None
-                })
-
-        elif tipo in ['deudores', 'aldia']:
-            query_base = '''
-                SELECT A.id AS propietario_id, A.nombre, A.celular, 
-                       B.id AS vehiculo_id, B.placa, B.marca, B.modelo, B.anio, B.color, B.tipo, B.valor_mensual, B.puesto
-                FROM propietarios A
-                INNER JOIN vehiculos B ON A.id = B.propietario_id
-            '''
-            cursor.execute(query_base)
-            rows = cursor.fetchall()
-
-            for row in rows:
-                cursor.execute('''
-                    SELECT monto, fecha_pago_esperado, fecha_pago_real, pagado, metodo_pago
-                    FROM pagos
-                    WHERE vehiculo_id = ? AND strftime('%Y-%m', fecha_pago_esperado) = strftime('%Y-%m', ?)
-                    ORDER BY fecha_pago_real DESC LIMIT 1
-                ''', (row["vehiculo_id"], hoy))
-                pago = cursor.fetchone()
-
-                valor_mensual = row["valor_mensual"] if row["valor_mensual"] is not None else 0
-                monto_pagado = pago["monto"] if pago and pago["pagado"] else 0
-                deuda = valor_mensual - monto_pagado
-                estado = "al día" if pago and pago["pagado"] and deuda <= 0 else "en mora"
-
-                if (tipo == 'deudores' and estado == 'en mora') or (tipo == 'aldia' and estado == 'al día'):
-                    resultados.append({
-                        "propietario_id": row["propietario_id"],
-                        "nombre": row["nombre"],
-                        "celular": row["celular"],
-                        "vehiculo_id": row["vehiculo_id"],
-                        "placa": row["placa"],
-                        "marca": row["marca"],
-                        "modelo": row["modelo"],
-                        "anio": row["anio"],
-                        "color": row["color"],
-                        "tipo": row["tipo"],
-                        "valor_mensual": valor_mensual,
-                        "puesto": row["puesto"],
-                        "estado": estado,
-                        "monto_pagado": monto_pagado,
-                        "deuda": deuda,
-                        "fecha_pago_esperado": pago["fecha_pago_esperado"] if pago else None,
-                        "fecha_pago_real": pago["fecha_pago_real"] if pago else None,
-                        "metodo_pago": pago["metodo_pago"] if pago else None
-                    })
+            resultados.append(construir_resultado(row, pago))
 
         conn.close()
         logging.debug(f"Resultados finales: {len(resultados)}")
@@ -265,15 +339,7 @@ def pagos_de_propietario(id_propietario):
 @app.route("/vehiculos/<int:id_propietario>", methods=["GET"])
 def vehiculos_de_propietario(id_propietario):
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT id, placa, marca, modelo, anio, color, tipo, valor_mensual
-            FROM vehiculos
-            WHERE propietario_id = ?
-        ''', (id_propietario,))
-        rows = cursor.fetchall()
-        conn.close()
+        rows = vehiculos.obtener_vehiculos_por_propietario(id_propietario)
         vehiculos_list = [
             {
                 "id": row["id"],
@@ -283,7 +349,8 @@ def vehiculos_de_propietario(id_propietario):
                 "anio": row["anio"],
                 "color": row["color"],
                 "tipo": row["tipo"],
-                "valor_mensual": row["valor_mensual"] if row["valor_mensual"] is not None else 0
+                "valor_mensual": row["valor_mensual"] if row["valor_mensual"] is not None else 0,
+                "puesto": row["puesto"]
             } for row in rows
         ]
         logging.debug(f"Vehículos encontrados para propietario {id_propietario}: {len(vehiculos_list)}")
@@ -354,3 +421,4 @@ def serve_components(filename):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+ 

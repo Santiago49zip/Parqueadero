@@ -1,21 +1,36 @@
 import sqlite3
-import os
+from backend.db import get_connection
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DB_PATH = os.path.join(BASE_DIR, "backend", "parqueadero.db")
 
 def obtener_todos_los_vehiculos():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM vehiculos")
-    resultado = cursor.fetchall()
-    conn.close()
-    return resultado
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, propietario_id, placa, tipo, valor_mensual, puesto FROM vehiculos")
+        return cursor.fetchall()
+    finally:
+        conn.close()
+
 
 def obtener_vehiculo_por_placa(placa):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM vehiculos WHERE placa = ?", (placa,))
-    resultado = cursor.fetchone()
-    conn.close()
-    return resultado
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, propietario_id, placa, tipo, marca, modelo, anio, color, valor_mensual, puesto FROM vehiculos WHERE UPPER(REPLACE(placa, ' ', '')) = ?", (placa.upper().replace(' ', ''),))
+        return cursor.fetchone()
+    finally:
+        conn.close()
+
+
+def obtener_vehiculos_por_propietario(propietario_id):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, propietario_id, placa, marca, modelo, anio, color, tipo, valor_mensual, puesto
+            FROM vehiculos
+            WHERE propietario_id = ?
+        ''', (propietario_id,))
+        return cursor.fetchall()
+    finally:
+        conn.close()

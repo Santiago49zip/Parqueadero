@@ -1,12 +1,15 @@
 import sqlite3
 import pandas as pd
+import os
 
 
 # Ruta al archivo Excel (ajústala si lo pusiste en otro lugar)
 archivo_excel = 'Data/Parqueadero.xlsx'
 
-# Conectamos a la base de datos
-conn = sqlite3.connect('BD/parqueadero.db')
+# Conectamos a la base de datos (usar la DB centralizada en backend)
+BASE_DIR = os.path.dirname(__file__)
+DB_PATH = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'parqueadero.db'))
+conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()
 
 # Nombres de las hojas que quieres importar
@@ -28,6 +31,8 @@ for hoja in hojas:
         puesto = str(fila.get('No/SITIO', '') or '')
         dia_pago = int(fila.get('DIA PAGO', 1)) if not pd.isna(fila.get('DIA PAGO')) else 1
         valor = int(fila.get('VALOR', 0)) if not pd.isna(fila.get('VALOR')) else 0
+        # Determinar tipo según la hoja
+        tipo = 'moto' if hoja.upper().startswith('MOTO') else 'carro'
         observacion = str(fila.get('OBSERVACION', '') or '')
 
         # Insertamos o recuperamos propietario
@@ -45,11 +50,11 @@ for hoja in hojas:
             ''', (nombre, celular, celular2))
             propietario_id = cursor.lastrowid
 
-        # Insertamos vehículo
+        # Insertamos vehículo (incluye tipo, valor_mensual y puesto)
         cursor.execute('''
-            INSERT INTO vehiculos (propietario_id, placa, marca, modelo, anio, color)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (propietario_id, placa, marca, modelo, anio, color))
+            INSERT INTO vehiculos (propietario_id, placa, marca, modelo, anio, color, tipo, valor_mensual, puesto)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (propietario_id, placa, marca, modelo, anio, color, tipo, valor, puesto))
         vehiculo_id = cursor.lastrowid
 
         # Insertamos pago

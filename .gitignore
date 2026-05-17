@@ -2,3 +2,11 @@ venv/
 __pycache__/
 *.pyc
 .env
+
+# Ignore Excel files in Data folder
+Data/*.xlsx
+backend/parqueadero.db
+*.db
+Data/*.xls
+scripts/
+
